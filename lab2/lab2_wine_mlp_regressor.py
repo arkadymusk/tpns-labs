@@ -22,7 +22,7 @@ np.random.seed(RANDOM_STATE)
 # 1. Загрузка и preprocessing
 # =========================
 
-def load_wine_data(red_path: str = "winequality-red.csv", white_path: str = "winequality-white.csv") -> pd.DataFrame:
+def load_wine_data(red_path: str = "dataset/winequality-red.csv", white_path: str = "dataset/winequality-white.csv") -> pd.DataFrame:
     red = pd.read_csv(red_path, sep=";")
     white = pd.read_csv(white_path, sep=";")
 

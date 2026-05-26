@@ -24,7 +24,7 @@ RESULTS_DIR = "results_lab2_classifier"
 
 def load_credit_data() -> pd.DataFrame:
     possible_paths = [
-        "default_of_credit_card_clients.csv",
+        "dataset/default_of_credit_card_clients.csv",
         "default of credit card clients.csv",
         "default of credit card clients.xls",
     ]

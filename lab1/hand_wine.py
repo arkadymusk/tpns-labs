@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 
 def load_data():
-    red = pd.read_csv('winequality-red.csv', sep=';')
-    white = pd.read_csv('winequality-white.csv', sep=';')
+    red = pd.read_csv('dataset/winequality-red.csv', sep=';')
+    white = pd.read_csv('dataset/winequality-white.csv', sep=';')
     red['color'] = 0
     white['color'] = 1
     df = pd.concat([red, white], ignore_index=True)

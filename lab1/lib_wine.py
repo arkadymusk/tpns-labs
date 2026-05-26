@@ -8,8 +8,8 @@ from sklearn.metrics import accuracy_score, classification_report
 
 
 def load_data():
-    red = pd.read_csv('winequality-red.csv', sep=';')
-    white = pd.read_csv('winequality-white.csv', sep=';')
+    red = pd.read_csv('dataset/winequality-red.csv', sep=';')
+    white = pd.read_csv('dataset/winequality-white.csv', sep=';')
     red['color'] = 0
     white['color'] = 1
     df = pd.concat([red, white], ignore_index=True).drop_duplicates().reset_index(drop=True)
