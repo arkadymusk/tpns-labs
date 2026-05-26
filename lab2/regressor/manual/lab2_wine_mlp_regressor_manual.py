@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import os
-import warnings
 from dataclasses import dataclass
 from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-from sklearn.neural_network import MLPRegressor
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 RANDOM_STATE = 42
@@ -85,7 +80,7 @@ def preprocess_dataset(df: pd.DataFrame, corr_threshold: float = 0.85, top_featu
 
     df = df.drop(columns=to_drop)
 
-    os.makedirs("results_lab2", exist_ok=True)
+    os.makedirs("results_lab2_manual_regressor", exist_ok=True)
     plt.figure(figsize=(11, 9))
     plt.imshow(df.drop(columns=["quality_class"]).corr(numeric_only=True), aspect="auto")
     plt.xticks(range(len(df.drop(columns=["quality_class"]).columns)), df.drop(columns=["quality_class"]).columns, rotation=90)
@@ -93,7 +88,7 @@ def preprocess_dataset(df: pd.DataFrame, corr_threshold: float = 0.85, top_featu
     plt.colorbar(label="correlation")
     plt.title("Корреляционная матрица после preprocessing")
     plt.tight_layout()
-    plt.savefig("results_lab2/correlation_after_preprocessing.png", dpi=200)
+    plt.savefig("results_lab2_manual_regressor/correlation_after_preprocessing.png", dpi=200)
     plt.close()
 
     X_for_rating = df.drop(columns=["quality", "quality_class"])
@@ -107,7 +102,7 @@ def preprocess_dataset(df: pd.DataFrame, corr_threshold: float = 0.85, top_featu
     print(rating)
 
     selected_features = list(rating.head(top_features_count).index)
-    print(f"\nВыбранные признаки для MLP-регрессора, top-{top_features_count}:")
+    print(f"\nВыбранные признаки для ручного MLP-регрессора, top-{top_features_count}:")
     print(selected_features)
 
     return df, selected_features, rating
@@ -150,7 +145,7 @@ class StandardScalerManual:
 
 
 # =========================
-# 3. Самописный MLP-регрессор
+# 3. Ручной MLP-регрессор
 # =========================
 
 class MLPRegressorManual:
@@ -158,7 +153,6 @@ class MLPRegressorManual:
         self.learning_rate = learning_rate
         rng = np.random.default_rng(random_state)
 
-        # Инициализация Xavier/Glorot
         self.W1 = rng.normal(0, np.sqrt(2 / (input_size + hidden1)), size=(input_size, hidden1))
         self.b1 = np.zeros((1, hidden1))
 
@@ -183,9 +177,7 @@ class MLPRegressorManual:
         z2 = a1 @ self.W2 + self.b2
         a2 = self.tanh(z2)
 
-        # Линейный выход: прогноз качества вина
         y_pred = a2 @ self.W3 + self.b3
-
         cache = (X, z1, a1, z2, a2, y_pred)
         return y_pred, cache
 
@@ -199,17 +191,14 @@ class MLPRegressorManual:
 
         d_y_pred = 2 * (y_pred - y_true) / n
 
-        # Выходной слой
         dW3 = a2.T @ d_y_pred
         db3 = np.sum(d_y_pred, axis=0, keepdims=True)
 
-        # Ошибка уходит назад во 2 скрытый слой
         da2 = d_y_pred @ self.W3.T
         dz2 = da2 * self.tanh_derivative(a2)
         dW2 = a1.T @ dz2
         db2 = np.sum(dz2, axis=0, keepdims=True)
 
-        # Ошибка уходит назад в 1 скрытый слой
         da1 = dz2 @ self.W2.T
         dz1 = da1 * self.tanh_derivative(a1)
         dW1 = X.T @ dz1
@@ -255,7 +244,7 @@ class MLPRegressorManual:
             history["train_mse"].append(train_mse)
             history["val_mse"].append(val_mse)
 
-            if epoch == 1 or epoch % 50 == 0:
+            if epoch == 1 or epoch % 50 == 0 or epoch == epochs:
                 print(f"Эпоха {epoch:4d}: train MSE = {train_mse:.4f}, test MSE = {val_mse:.4f}")
 
         return history
@@ -266,7 +255,7 @@ class MLPRegressorManual:
 
 
 # =========================
-# 4. Метрики и запуск
+# 4. Метрики, графики и запуск
 # =========================
 
 def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
@@ -280,18 +269,19 @@ def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 
 def save_plots(history: dict, y_true: np.ndarray, y_pred: np.ndarray):
-    os.makedirs("results_lab2", exist_ok=True)
+    os.makedirs("results_lab2_manual_regressor", exist_ok=True)
 
+    epochs = range(1, len(history["train_mse"]) + 1)
     plt.figure(figsize=(9, 5))
-    plt.plot(history["train_mse"], label="train MSE")
-    plt.plot(history["val_mse"], label="test MSE")
+    plt.plot(epochs, history["train_mse"], label="manual train MSE")
+    plt.plot(epochs, history["val_mse"], label="manual test MSE")
     plt.xlabel("Эпоха")
     plt.ylabel("MSE")
-    plt.title("Изменение ошибки при обучении MLP")
+    plt.title("Изменение ошибки ручного MLPRegressor")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("results_lab2/loss_curve.png", dpi=200)
+    plt.savefig("results_lab2_manual_regressor/loss_curve.png", dpi=200)
     plt.close()
 
     plt.figure(figsize=(7, 7))
@@ -301,11 +291,11 @@ def save_plots(history: dict, y_true: np.ndarray, y_pred: np.ndarray):
     plt.plot([min_v, max_v], [min_v, max_v], linestyle="--", label="идеальный прогноз")
     plt.xlabel("Реальное качество")
     plt.ylabel("Предсказанное качество")
-    plt.title("MLP-регрессор: реальные и предсказанные значения")
+    plt.title("Ручной MLPRegressor: реальные и предсказанные значения")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("results_lab2/predicted_vs_real.png", dpi=200)
+    plt.savefig("results_lab2_manual_regressor/predicted_vs_real.png", dpi=200)
     plt.close()
 
 
@@ -322,7 +312,6 @@ def main():
     X_train_scaled = scaler_X.fit_transform(X_train)
     X_test_scaled = scaler_X.transform(X_test)
 
-    # Масштабируем y, чтобы сети было проще обучаться, потом вернём прогнозы в исходную шкалу качества вина
     scaler_y = StandardScalerManual()
     y_train_scaled = scaler_y.fit_transform(y_train)
     y_test_scaled = scaler_y.transform(y_test)
@@ -335,7 +324,7 @@ def main():
         random_state=RANDOM_STATE,
     )
 
-    print("\nНачинаем обучение MLP-регрессора...")
+    print("\nНачинаем обучение ручного MLP-регрессора...")
     history = model.fit(
         X_train_scaled,
         y_train_scaled,
@@ -349,86 +338,13 @@ def main():
     y_pred = y_pred_scaled * scaler_y.std_ + scaler_y.mean_
 
     metrics = regression_metrics(y_test, y_pred)
-    print("\nИтоговые метрики на тестовой выборке:")
+    print("\nИтоговые метрики ручного MLPRegressor на тестовой выборке:")
     for name, value in metrics.items():
         print(f"{name}: {value:.4f}")
 
-    print("\nБиблиотечная реализация MLPRegressor из sklearn...")
-    print("Начинаем обучение библиотечного MLPRegressor...")
-
-    library_regressor = MLPRegressor(
-        hidden_layer_sizes=(16, 8),
-        activation="relu",
-        solver="adam",
-        max_iter=1,
-        warm_start=True,
-        random_state=RANDOM_STATE,
-    )
-
-    library_epochs = 500
-    library_history = {"train_mse": [], "val_mse": []}
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=ConvergenceWarning)
-
-        for epoch in range(1, library_epochs + 1):
-            library_regressor.fit(X_train_scaled, y_train.ravel())
-
-            library_train_pred = library_regressor.predict(X_train_scaled)
-            library_test_pred = library_regressor.predict(X_test_scaled)
-
-            library_train_mse = mean_squared_error(y_train.ravel(), library_train_pred)
-            library_test_mse = mean_squared_error(y_test.ravel(), library_test_pred)
-
-            library_history["train_mse"].append(library_train_mse)
-            library_history["val_mse"].append(library_test_mse)
-
-            if epoch == 1 or epoch % 50 == 0 or epoch == library_epochs:
-                print(
-                    f"Эпоха {epoch:4d}: "
-                    f"train MSE = {library_train_mse:.4f}, "
-                    f"test MSE = {library_test_mse:.4f}"
-                )
-
-    library_predictions = library_regressor.predict(X_test_scaled)
-    library_mse = mean_squared_error(y_test.ravel(), library_predictions)
-    library_rmse = np.sqrt(library_mse)
-    library_mae = mean_absolute_error(y_test.ravel(), library_predictions)
-    library_r2 = r2_score(y_test.ravel(), library_predictions)
-
-    print("\nБиблиотечный MLPRegressor:")
-    print(f"MSE : {library_mse:.4f}")
-    print(f"RMSE: {library_rmse:.4f}")
-    print(f"MAE : {library_mae:.4f}")
-    print(f"R2  : {library_r2:.4f}")
-
     save_plots(history, y_test, y_pred)
+    print("\nГотово. Результаты сохранены в папку results_lab2_manual_regressor")
 
-    plt.figure(figsize=(9, 5))
-    plt.plot(library_history["train_mse"], label="library train MSE")
-    plt.plot(library_history["val_mse"], label="library test MSE")
-    plt.xlabel("Эпоха")
-    plt.ylabel("MSE")
-    plt.title("Изменение ошибки библиотечного MLPRegressor")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("results_lab2/library_loss_curve.png", dpi=200)
-    plt.close()
-
-    plt.figure(figsize=(7, 7))
-    plt.scatter(y_test.ravel(), library_predictions, alpha=0.35)
-    min_v = min(float(y_test.min()), float(library_predictions.min()))
-    max_v = max(float(y_test.max()), float(library_predictions.max()))
-    plt.plot([min_v, max_v], [min_v, max_v], linestyle="--", label="идеальный прогноз")
-    plt.xlabel("Реальное качество")
-    plt.ylabel("Предсказанное качество")
-    plt.title("Библиотечный MLPRegressor: реальные и предсказанные значения")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("results_lab2/library_predicted_vs_real.png", dpi=200)
-    plt.close()
 
 if __name__ == "__main__":
     main()

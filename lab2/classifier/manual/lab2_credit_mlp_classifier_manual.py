@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import warnings
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
@@ -9,13 +8,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from sklearn.neural_network import MLPClassifier
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, log_loss
 
 RANDOM_STATE = 42
 np.random.seed(RANDOM_STATE)
-RESULTS_DIR = "results_lab2_classifier"
+RESULTS_DIR = "results_lab2_classifier_manual"
 
 
 # =========================================================
@@ -449,6 +445,11 @@ def plot_confusion_matrix(cm: np.ndarray, path: str) -> None:
 # 7. Main
 # =========================================================
 
+
+# =========================================================
+# 7. Main: ручная реализация
+# =========================================================
+
 def main() -> None:
     df_raw = load_credit_data()
     df, selected_features, gain_rating, dropped_corr = preprocess_dataset(
@@ -466,12 +467,15 @@ def main() -> None:
     for cls, cnt in zip(unique, counts):
         print(f"class {cls}: {cnt} ({cnt / len(y):.2%})")
 
-    X_train, X_test, y_train, y_test = train_test_split_stratified(X, y, test_size=0.2, random_state=RANDOM_STATE)
+    X_train, X_test, y_train, y_test = train_test_split_stratified(
+        X, y, test_size=0.2, random_state=RANDOM_STATE
+    )
 
     scaler = StandardScalerManual()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
+    print("\nРучная реализация MLP-классификатора на NumPy...")
     model = MLPBinaryClassifierManual(
         input_size=X_train_scaled.shape[1],
         hidden1=32,
@@ -497,7 +501,7 @@ def main() -> None:
     accuracy = accuracy_score_manual(y_test, y_pred)
     precision, recall, f1 = precision_recall_f1_manual(y_test, y_pred)
 
-    print("\nИтоговые метрики на test:")
+    print("\nИтоговые метрики ручного MLP-классификатора на test:")
     print("Confusion matrix [[TN, FP], [FN, TP]]:")
     print(cm)
     print(f"Accuracy : {accuracy:.4f}")
@@ -505,124 +509,31 @@ def main() -> None:
     print(f"Recall   : {recall:.4f}")
     print(f"F1-score : {f1:.4f}")
 
-    print("\nБиблиотечная реализация MLPClassifier из sklearn...")
-    print("Начинаем обучение библиотечного MLPClassifier...")
-
-    library_classifier = MLPClassifier(
-        hidden_layer_sizes=(32, 16),
-        activation="relu",
-        solver="adam",
-        max_iter=1,
-        warm_start=True,
-        random_state=RANDOM_STATE
-    )
-
-    library_epochs = 50
-    library_history = {
-        "train_loss": [],
-        "test_loss": [],
-        "train_accuracy": [],
-        "test_accuracy": [],
-    }
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=ConvergenceWarning)
-
-        for epoch in range(1, library_epochs + 1):
-            library_classifier.fit(X_train_scaled, y_train)
-
-            train_proba = library_classifier.predict_proba(X_train_scaled)
-            test_proba = library_classifier.predict_proba(X_test_scaled)
-            train_pred = library_classifier.predict(X_train_scaled)
-            test_pred = library_classifier.predict(X_test_scaled)
-
-            train_loss = log_loss(y_train, train_proba)
-            test_loss = log_loss(y_test, test_proba)
-            train_acc = accuracy_score(y_train, train_pred)
-            test_acc = accuracy_score(y_test, test_pred)
-
-            library_history["train_loss"].append(train_loss)
-            library_history["test_loss"].append(test_loss)
-            library_history["train_accuracy"].append(train_acc)
-            library_history["test_accuracy"].append(test_acc)
-
-            if epoch == 1 or epoch % 10 == 0 or epoch == library_epochs:
-                print(
-                    f"Epoch {epoch:4d}/{library_epochs} | "
-                    f"train_loss={train_loss:.4f} | test_loss={test_loss:.4f} | "
-                    f"train_acc={train_acc:.4f} | test_acc={test_acc:.4f}"
-                )
-
-    library_pred = library_classifier.predict(X_test_scaled)
-    library_cm = confusion_matrix(y_test, library_pred)
-    library_accuracy = accuracy_score(y_test, library_pred)
-    library_precision = precision_score(y_test, library_pred, zero_division=0)
-    library_recall = recall_score(y_test, library_pred, zero_division=0)
-    library_f1 = f1_score(y_test, library_pred, zero_division=0)
-
-    print("\nИтоговые метрики библиотечного MLPClassifier на test:")
-    print("Confusion matrix [[TN, FP], [FN, TP]]:")
-    print(library_cm)
-    print(f"Accuracy : {library_accuracy:.4f}")
-    print(f"Precision: {library_precision:.4f}")
-    print(f"Recall   : {library_recall:.4f}")
-    print(f"F1-score : {library_f1:.4f}")
-
-    # Матрица ошибок для библиотечной реализации
-    plot_confusion_matrix(
-        library_cm,
-        os.path.join(RESULTS_DIR, "library_confusion_matrix.png")
-    )
-
-    # График функции ошибки для библиотечной реализации
-    plt.figure(figsize=(9, 5))
-    plt.plot(library_history["train_loss"], label="library train loss")
-    plt.plot(library_history["test_loss"], label="library test loss")
-    plt.xlabel("Epoch")
-    plt.ylabel("Log loss")
-    plt.title("Динамика ошибки библиотечного MLPClassifier")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, "library_loss_curve.png"), dpi=200)
-    plt.close()
-
-    # График accuracy для библиотечной реализации
-    plt.figure(figsize=(9, 5))
-    plt.plot(library_history["train_accuracy"], label="library train accuracy")
-    plt.plot(library_history["test_accuracy"], label="library test accuracy")
-    plt.xlabel("Epoch")
-    plt.ylabel("Accuracy")
-    plt.title("Динамика accuracy библиотечного MLPClassifier")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, "library_accuracy_curve.png"), dpi=200)
-    plt.close()
-
     # График функции ошибки
     plt.figure(figsize=(9, 5))
-    plt.plot(history["train_loss"], label="train loss")
-    plt.plot(history["val_loss"], label="test loss")
+    plt.plot(history["train_loss"], label="manual train loss")
+    plt.plot(history["val_loss"], label="manual test loss")
     plt.xlabel("Epoch")
     plt.ylabel("Binary cross-entropy")
-    plt.title("Динамика ошибки MLP-классификатора")
+    plt.title("Динамика ошибки ручного MLP-классификатора")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, "loss_curve.png"), dpi=200)
+    plt.savefig(os.path.join(RESULTS_DIR, "manual_loss_curve.png"), dpi=200)
     plt.close()
 
     # График accuracy
     plt.figure(figsize=(9, 5))
-    plt.plot(history["train_accuracy"], label="train accuracy")
-    plt.plot(history["val_accuracy"], label="test accuracy")
+    plt.plot(history["train_accuracy"], label="manual train accuracy")
+    plt.plot(history["val_accuracy"], label="manual test accuracy")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
-    plt.title("Динамика accuracy MLP-классификатора")
+    plt.title("Динамика accuracy ручного MLP-классификатора")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(RESULTS_DIR, "accuracy_curve.png"), dpi=200)
+    plt.savefig(os.path.join(RESULTS_DIR, "manual_accuracy_curve.png"), dpi=200)
     plt.close()
 
-    plot_confusion_matrix(cm, os.path.join(RESULTS_DIR, "confusion_matrix.png"))
+    plot_confusion_matrix(cm, os.path.join(RESULTS_DIR, "manual_confusion_matrix.png"))
 
 
 if __name__ == "__main__":
